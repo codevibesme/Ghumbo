@@ -9,7 +9,7 @@
   "scripts": {
     "build": "nest build",
     "deploy": "nest deploy",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\"",
     "start": "env-cmd -f .env env-cmd -f .env.prod node dist/main",
     "dev": "env-cmd -f .env env-cmd -f .env.local nest start --watch",
     "lint": "oxlint src/ test/",

@@ -7,7 +7,6 @@ import dbConfig from './configs/db.config.js';
 import { AppService } from './app.service.js';
 import { MODULES } from './modules/index.js';
 
-
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
