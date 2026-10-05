@@ -5,6 +5,7 @@ import {
   JoinColumn,
   ManyToOne,
   PrimaryColumn,
+  type Relation,
   UpdateDateColumn,
 } from 'typeorm';
 import { ulid } from 'ulid';
@@ -24,7 +25,7 @@ export class UserDocumentEntity {
     name: 'user_id',
     foreignKeyConstraintName: 'fk_user_documents_user',
   })
-  user: UserEntity;
+  user: Relation<UserEntity>;
 
   @Column({ name: 'type', type: 'enum', enum: EUserDocument })
   type: EUserDocument;

@@ -10,6 +10,7 @@ import {
 import { ulid } from 'ulid';
 import { EUserRole } from '../types/users.type.js';
 import { UserDocumentEntity } from './user_documents.entity.js';
+import { UserSessionEntity } from './user_sessions.entity.js';
 
 @Entity('users')
 export class UserEntity {
@@ -36,6 +37,17 @@ export class UserEntity {
   })
   role: EUserRole;
 
+  @Column({
+    name: 'password_hash',
+    type: 'varchar',
+    length: 60,
+    nullable: true,
+  })
+  passwordHash: string | null;
+
+  @Column({ name: 'is_verified', type: 'boolean', default: false })
+  isVerified: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
@@ -46,4 +58,9 @@ export class UserEntity {
     onDelete: 'CASCADE',
   })
   documents: UserDocumentEntity[];
+
+  @OneToMany(() => UserSessionEntity, (sessions) => sessions.user, {
+    onDelete: 'CASCADE',
+  })
+  sessions: UserSessionEntity[];
 }

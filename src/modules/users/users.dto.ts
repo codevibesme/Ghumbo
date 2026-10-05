@@ -1,4 +1,4 @@
-import { OmitType, PickType } from '@nestjs/swagger';
+import { OmitType, PartialType, PickType } from '@nestjs/swagger';
 import { UserEntity } from '../../entities/users.entity.js';
 
 export class UserDto extends UserEntity {}
@@ -18,4 +18,6 @@ export class CreateUserDto extends OmitType(UserDto, [
   'documents',
 ]) {}
 
-export class UpdateUserDto extends OmitType(CreateUserDto, ['email', 'role']) {}
+export class UpdateUserDto extends PartialType(
+  OmitType(CreateUserDto, ['email', 'role']),
+) {}
