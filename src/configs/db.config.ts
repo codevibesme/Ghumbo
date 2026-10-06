@@ -1,5 +1,9 @@
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import pg from 'pg';
 import ENTITIES from '../entities/index.js';
+
+// Return `date` columns as 'YYYY-MM-DD' strings instead of local-midnight JS Dates
+pg.types.setTypeParser(pg.types.builtins.DATE, (value) => value);
 
 const dbConfig: TypeOrmModuleOptions = {
   type: 'postgres',

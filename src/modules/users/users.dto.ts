@@ -5,10 +5,10 @@ export class UserDto extends UserEntity {}
 
 export class UserDetailsDto extends PickType(UserDto, [
   'id',
-  'firstName',
-  'lastName',
+  'name',
   'email',
   'phone',
+  'photo',
 ]) {}
 
 export class CreateUserDto extends OmitType(UserDto, [

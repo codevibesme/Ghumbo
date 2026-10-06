@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -7,16 +8,29 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { DestinationEntity } from './destinations.entity.js';
+import type { TAsset } from '../types/misc.type.js';
+import { ECountryStatus } from '../types/countries.type.js';
 
 @Entity('countries')
+@Check('chk_countries_code_upper', `"code" = upper("code")`)
+@Check('chk_countries_latitude', `"latitude" BETWEEN -90 AND 90`)
+@Check('chk_countries_longitude', `"longitude" BETWEEN -180 AND 180`)
 export class CountryEntity {
   @PrimaryGeneratedColumn('identity')
   id: number;
 
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: ECountryStatus,
+    default: ECountryStatus.COMING_SOON,
+  })
+  status: ECountryStatus;
+
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
 
-  @Column({ name: 'code', type: 'varchar', length: 2 })
+  @Column({ name: 'code', type: 'char', length: 2, unique: true })
   code: string;
 
   @Column({ name: 'latitude', type: 'double precision' })
@@ -25,8 +39,8 @@ export class CountryEntity {
   @Column({ name: 'longitude', type: 'double precision' })
   longitude: number;
 
-  @Column({ name: 'image_url', type: 'varchar', length: 255 })
-  imageUrl: string;
+  @Column({ name: 'assets', type: 'jsonb', default: () => "'[]'" })
+  assets: TAsset[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
@@ -34,8 +48,6 @@ export class CountryEntity {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  @OneToMany(() => DestinationEntity, (destination) => destination.country, {
-    onDelete: 'CASCADE',
-  })
+  @OneToMany(() => DestinationEntity, (destination) => destination.country)
   destinations: DestinationEntity[];
 }

@@ -11,22 +11,21 @@ import { ulid } from 'ulid';
 import { EUserRole } from '../types/users.type.js';
 import { UserDocumentEntity } from './user_documents.entity.js';
 import { UserSessionEntity } from './user_sessions.entity.js';
+import { TourInquiryEntity } from './tour_inquiries.entity.js';
+import type { TAsset } from '../types/misc.type.js';
 
 @Entity('users')
 export class UserEntity {
   @PrimaryColumn({ name: 'id', type: 'varchar', length: 26 })
   id: string = ulid();
 
-  @Column({ name: 'first_name', type: 'varchar', length: 50 })
-  firstName: string;
+  @Column({ name: 'name', type: 'varchar', length: 50 })
+  name: string;
 
-  @Column({ name: 'last_name', type: 'varchar', length: 50 })
-  lastName: string;
-
-  @Column({ name: 'email', type: 'varchar', length: 254 })
+  @Column({ name: 'email', type: 'citext', unique: true })
   email: string;
 
-  @Column({ name: 'phone', type: 'varchar', length: 15, nullable: true })
+  @Column({ name: 'phone', type: 'varchar', length: 16, nullable: true })
   phone: string | null;
 
   @Column({
@@ -37,10 +36,13 @@ export class UserEntity {
   })
   role: EUserRole;
 
+  @Column({ name: 'photo', type: 'jsonb', nullable: true })
+  photo: TAsset | null;
+
   @Column({
     name: 'password_hash',
     type: 'varchar',
-    length: 60,
+    length: 255,
     nullable: true,
   })
   passwordHash: string | null;
@@ -54,13 +56,12 @@ export class UserEntity {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  @OneToMany(() => UserDocumentEntity, (documents) => documents.user, {
-    onDelete: 'CASCADE',
-  })
+  @OneToMany(() => UserDocumentEntity, (documents) => documents.user)
   documents: UserDocumentEntity[];
 
-  @OneToMany(() => UserSessionEntity, (sessions) => sessions.user, {
-    onDelete: 'CASCADE',
-  })
+  @OneToMany(() => UserSessionEntity, (sessions) => sessions.user)
   sessions: UserSessionEntity[];
+
+  @OneToMany(() => TourInquiryEntity, (inquiries) => inquiries.user)
+  inquiries: TourInquiryEntity[];
 }
