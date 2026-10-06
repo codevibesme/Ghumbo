@@ -17,6 +17,7 @@ import { TourDepartureEntity } from './tour_departures.entity.js';
 import { UserEntity } from './users.entity.js';
 
 @Entity('tour_inquiries')
+@Index('idx_tour_inquiries_status_created_at', ['status', 'createdAt'])
 @Check('chk_tour_inquiries_traveler_count', `"traveler_count" > 0`)
 export class TourInquiryEntity {
   @PrimaryColumn({ name: 'id', type: 'varchar', length: 26 })

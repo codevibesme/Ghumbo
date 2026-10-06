@@ -9,6 +9,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   type Relation,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { CountryEntity } from './countries.entity.js';
@@ -17,6 +18,8 @@ import type { TAsset } from '../types/misc.type.js';
 import { EDestinationStatus } from '../types/destinations.type.js';
 
 @Entity('destinations')
+@Unique('uq_destinations_slug', ['slug'])
+@Check('chk_destinations_slug', `"slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`)
 @Check('chk_destinations_latitude', `"latitude" BETWEEN -90 AND 90`)
 @Check('chk_destinations_longitude', `"longitude" BETWEEN -180 AND 180`)
 export class DestinationEntity {
@@ -46,6 +49,9 @@ export class DestinationEntity {
 
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
+
+  @Column({ name: 'slug', type: 'varchar', length: 255 })
+  slug: string;
 
   @Column({ name: 'overview', type: 'text' })
   overview: string;

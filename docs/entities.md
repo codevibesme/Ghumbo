@@ -45,7 +45,7 @@ Effectively: a country, destination, or tour cannot be deleted while it has chil
   | Kind | Pattern | Example |
   |---|---|---|
   | Foreign key | `fk_<table>_<column>` | `fk_tour_inquiries_user_id` |
-  | Index | `idx_<table>_<column>` | `idx_tours_destination_id` |
+  | Index | `idx_<table>_<columns>` | `idx_tours_destination_id` |
   | Check | `chk_<table>_<what>` | `chk_tour_departures_dates` |
   | Unique | `uq_<table>_<columns>` | `uq_tour_departure_prices_departure_type_currency` |
 - **FK columns are indexed** (Postgres does not do this automatically).
@@ -81,6 +81,7 @@ Effectively: a country, destination, or tour cannot be deleted while it has chil
 | `country_id` | `countryId` | `integer` | | | FK → `countries.id`, indexed |
 | `status` | `status` | enum `EDestinationStatus` | | `coming_soon` | |
 | `name` | `name` | `varchar(255)` | | | |
+| `slug` | `slug` | `varchar(255)` | | | Unique. URL slug, lowercase kebab-case |
 | `overview` | `overview` | `text` | | | |
 | `latitude` | `latitude` | `double precision` | | | |
 | `longitude` | `longitude` | `double precision` | | | |
@@ -88,7 +89,9 @@ Effectively: a country, destination, or tour cannot be deleted while it has chil
 | `created_at` | `createdAt` | `timestamptz` | | `now()` | |
 | `updated_at` | `updatedAt` | `timestamptz` | | `now()` | |
 
-**Checks:**
+**Constraints:**
+- `uq_destinations_slug`: unique on `slug`
+- `chk_destinations_slug`: `slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`
 - `chk_destinations_latitude`: latitude between -90 and 90
 - `chk_destinations_longitude`: longitude between -180 and 180
 
@@ -100,6 +103,7 @@ Effectively: a country, destination, or tour cannot be deleted while it has chil
 | `destination_id` | `destinationId` | `integer` | | | FK → `destinations.id`, indexed |
 | `status` | `status` | enum `ETourStatus` | | `draft` | |
 | `name` | `name` | `varchar(255)` | | | |
+| `slug` | `slug` | `varchar(255)` | | | Unique. URL slug, lowercase kebab-case |
 | `overview` | `overview` | `text` | | | |
 | `duration_days` | `durationDays` | `integer` | | | |
 | `duration_nights` | `durationNights` | `integer` | | | |
@@ -111,7 +115,9 @@ Effectively: a country, destination, or tour cannot be deleted while it has chil
 | `created_at` | `createdAt` | `timestamptz` | | `now()` | |
 | `updated_at` | `updatedAt` | `timestamptz` | | `now()` | |
 
-**Checks:**
+**Constraints:**
+- `uq_tours_slug`: unique on `slug` (globally, not per destination)
+- `chk_tours_slug`: `slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`
 - `chk_tours_duration`: `duration_days > 0 AND duration_nights >= 0 AND duration_nights <= duration_days`
 
 ### `tour_departures` — `TourDepartureEntity`
@@ -122,6 +128,7 @@ A scheduled run of a tour with fixed dates and seat capacity.
 |---|---|---|---|---|---|
 | `id` | `id` | `varchar(26)` | | ULID | PK |
 | `tour_id` | `tourId` | `varchar(26)` | | | FK → `tours.id`, indexed |
+| `status` | `status` | enum `ETourDepartureStatus` | | `draft` | |
 | `start_date` | `startDate` | `date` (`string`) | | | |
 | `end_date` | `endDate` | `date` (`string`) | | | |
 | `capacity` | `capacity` | `integer` | | | |
@@ -181,7 +188,8 @@ A lead submitted for a tour, optionally for a specific departure and optionally 
 | `created_at` | `createdAt` | `timestamptz` | | `now()` | |
 | `updated_at` | `updatedAt` | `timestamptz` | | `now()` | |
 
-**Checks:**
+**Constraints:**
+- `idx_tour_inquiries_status_created_at`: index on `(status, created_at)` for the admin lead list (filter by status, sort by newest)
 - `chk_tour_inquiries_traveler_count`: `traveler_count > 0`
 
 > The DB does not verify that `tour_departure_id` belongs to `tour_id`. Validate this in the service layer when creating an inquiry.
@@ -248,6 +256,7 @@ Stored as native Postgres enum types. Values can be added later, but not removed
 | `ECountryStatus` | `types/countries.type.ts` | `coming_soon`, `live` |
 | `EDestinationStatus` | `types/destinations.type.ts` | `coming_soon`, `live` |
 | `ETourStatus` | `types/tours.type.ts` | `draft`, `live` |
+| `ETourDepartureStatus` | `types/tour_departures.type.ts` | `draft`, `open`, `cancelled`, `completed` |
 | `ETourDeparturePriceType` | `types/tour_departure_prices.type.ts` | `adult`, `couple`, `child` |
 | `ECURRENCY` | `types/misc.type.ts` | `inr`, `usd`, `cad`, `aed` |
 | `ETourInquiryStatus` | `types/tour_inquiries.type.ts` | `new`, `contacted`, `in_progress`, `converted`, `closed` |

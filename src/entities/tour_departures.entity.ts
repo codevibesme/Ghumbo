@@ -15,6 +15,7 @@ import { ulid } from 'ulid';
 import { TourEntity } from './tours.entity.js';
 import { TourDeparturePriceEntity } from './tour_departure_prices.entity.js';
 import { TourInquiryEntity } from './tour_inquiries.entity.js';
+import { ETourDepartureStatus } from '../types/tour_departures.type.js';
 
 @Entity('tour_departures')
 @Check('chk_tour_departures_capacity', `"capacity" > 0`)
@@ -39,6 +40,14 @@ export class TourDepartureEntity {
     foreignKeyConstraintName: 'fk_tour_departures_tour_id',
   })
   tour: Relation<TourEntity>;
+
+  @Column({
+    name: 'status',
+    type: 'enum',
+    enum: ETourDepartureStatus,
+    default: ETourDepartureStatus.DRAFT,
+  })
+  status: ETourDepartureStatus;
 
   @Column({ name: 'start_date', type: 'date' })
   startDate: string;

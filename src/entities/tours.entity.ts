@@ -9,6 +9,7 @@ import {
   OneToMany,
   PrimaryColumn,
   type Relation,
+  Unique,
   UpdateDateColumn,
 } from 'typeorm';
 import { ulid } from 'ulid';
@@ -23,6 +24,8 @@ import { TourDepartureEntity } from './tour_departures.entity.js';
 import { TourInquiryEntity } from './tour_inquiries.entity.js';
 
 @Entity('tours')
+@Unique('uq_tours_slug', ['slug'])
+@Check('chk_tours_slug', `"slug" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`)
 @Check(
   'chk_tours_duration',
   `"duration_days" > 0 AND "duration_nights" >= 0 AND "duration_nights" <= "duration_days"`,
@@ -54,6 +57,9 @@ export class TourEntity {
 
   @Column({ name: 'name', type: 'varchar', length: 255 })
   name: string;
+
+  @Column({ name: 'slug', type: 'varchar', length: 255 })
+  slug: string;
 
   @Column({ name: 'overview', type: 'text' })
   overview: string;
