@@ -4,14 +4,14 @@ import { TourInquiryEntity } from './tour_inquiries.entity.js';
 import { TourDeparturePriceEntity } from './tour_departure_prices.entity.js';
 import { TourDepartureEntity } from './tour_departures.entity.js';
 import { TourEntity } from './tours.entity.js';
-import { UserDocumentEntity } from './user_documents.entity.js';
-import { UserSessionEntity } from './user_sessions.entity.js';
+import { AuthSessionEntity } from './auth_sessions.entity.js';
 import { UserEntity } from './users.entity.js';
+import { AuthIdentityEntity } from './auth_identities.entity.js';
 
 const ENTITIES = [
   UserEntity,
-  UserDocumentEntity,
-  UserSessionEntity,
+  AuthIdentityEntity,
+  AuthSessionEntity,
   CountryEntity,
   DestinationEntity,
   TourEntity,

@@ -9,10 +9,10 @@ import {
 
 import { ulid } from 'ulid';
 import { EUserRole } from '../types/users.type.js';
-import { UserDocumentEntity } from './user_documents.entity.js';
-import { UserSessionEntity } from './user_sessions.entity.js';
+import { AuthSessionEntity } from './auth_sessions.entity.js';
 import { TourInquiryEntity } from './tour_inquiries.entity.js';
 import type { TAsset } from '../types/misc.type.js';
+import { AuthIdentityEntity } from './auth_identities.entity.js';
 
 @Entity('users')
 export class UserEntity {
@@ -22,10 +22,16 @@ export class UserEntity {
   @Column({ name: 'name', type: 'varchar', length: 50 })
   name: string;
 
-  @Column({ name: 'email', type: 'citext', unique: true })
-  email: string;
+  @Column({ name: 'email', type: 'citext', unique: true, nullable: true })
+  email: string | null;
 
-  @Column({ name: 'phone', type: 'varchar', length: 16, nullable: true })
+  @Column({
+    name: 'phone',
+    type: 'varchar',
+    length: 16,
+    unique: true,
+    nullable: true,
+  })
   phone: string | null;
 
   @Column({
@@ -39,28 +45,17 @@ export class UserEntity {
   @Column({ name: 'photo', type: 'jsonb', nullable: true })
   photo: TAsset | null;
 
-  @Column({
-    name: 'password_hash',
-    type: 'varchar',
-    length: 255,
-    nullable: true,
-  })
-  passwordHash: string | null;
-
-  @Column({ name: 'is_verified', type: 'boolean', default: false })
-  isVerified: boolean;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt: Date;
 
-  @OneToMany(() => UserDocumentEntity, (documents) => documents.user)
-  documents: UserDocumentEntity[];
+  @OneToMany(() => AuthIdentityEntity, (identities) => identities.user)
+  identities: AuthIdentityEntity[];
 
-  @OneToMany(() => UserSessionEntity, (sessions) => sessions.user)
-  sessions: UserSessionEntity[];
+  @OneToMany(() => AuthSessionEntity, (sessions) => sessions.user)
+  sessions: AuthSessionEntity[];
 
   @OneToMany(() => TourInquiryEntity, (inquiries) => inquiries.user)
   inquiries: TourInquiryEntity[];

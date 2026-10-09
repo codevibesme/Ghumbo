@@ -15,7 +15,9 @@ export class CreateUserDto extends OmitType(UserDto, [
   'id',
   'createdAt',
   'updatedAt',
-  'documents',
+  'identities',
+  'sessions',
+  'inquiries',
 ]) {}
 
 export class UpdateUserDto extends PartialType(

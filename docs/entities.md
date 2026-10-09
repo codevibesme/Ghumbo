@@ -13,8 +13,8 @@ erDiagram
     tours ||--o{ tour_inquiries : "receives"
     tour_departures |o--o{ tour_inquiries : "optionally for"
     users |o--o{ tour_inquiries : "optionally by"
-    users ||--o{ user_sessions : "has"
-    users ||--o{ user_documents : "has"
+    users ||--o{ auth_identities : "has"
+    users ||--o{ auth_sessions : "has"
 ```
 
 | Child → Parent | FK column | On delete |
@@ -26,10 +26,10 @@ erDiagram
 | `tour_inquiries` → `tours` | `tour_id` | `RESTRICT` |
 | `tour_inquiries` → `tour_departures` | `tour_departure_id` | `SET NULL` |
 | `tour_inquiries` → `users` | `user_id` | `SET NULL` |
-| `user_sessions` → `users` | `user_id` | `CASCADE` |
-| `user_documents` → `users` | `user_id` | `CASCADE` |
+| `auth_identities` → `users` | `user_id` | `CASCADE` |
+| `auth_sessions` → `users` | `user_id` | `CASCADE` |
 
-Effectively: a country, destination, or tour cannot be deleted while it has children / inquiries. Deleting a tour with no inquiries removes its departures and their prices. Deleting a user removes their sessions and documents but keeps their inquiries (detached).
+Effectively: a country, destination, or tour cannot be deleted while it has children / inquiries. Deleting a tour with no inquiries removes its departures and their prices. Deleting a user removes their auth identities and sessions but keeps their inquiries (detached).
 
 ## Conventions
 
@@ -204,18 +204,37 @@ A lead submitted for a tour, optionally for a specific departure and optionally 
 |---|---|---|---|---|---|
 | `id` | `id` | `varchar(26)` | | ULID | PK |
 | `name` | `name` | `varchar(50)` | | | |
-| `email` | `email` | `citext` | | | Unique, case-insensitive |
-| `phone` | `phone` | `varchar(16)` | ✓ | | E.164 |
+| `email` | `email` | `citext` | ✓ | | Unique, case-insensitive. Null for phone-only users |
+| `phone` | `phone` | `varchar(16)` | ✓ | | Unique. E.164 |
 | `role` | `role` | enum `EUserRole` | | `customer` | |
 | `photo` | `photo` | `jsonb` (`TAsset`) | ✓ | | |
-| `password_hash` | `passwordHash` | `varchar(255)` | ✓ | | Null for passwordless / social login |
-| `is_verified` | `isVerified` | `boolean` | | `false` | |
 | `created_at` | `createdAt` | `timestamptz` | | `now()` | |
 | `updated_at` | `updatedAt` | `timestamptz` | | `now()` | |
 
 > `citext` requires the `citext` extension. TypeORM runs `CREATE EXTENSION IF NOT EXISTS citext` on startup, which needs a DB role with permission to create extensions.
 
-### `user_sessions` — `UserSessionEntity`
+### `auth_identities` — `AuthIdentityEntity`
+
+One row per login method linked to a user (email + password, phone OTP, Google, …).
+
+| Column | Property | Type | Null | Default | Notes |
+|---|---|---|---|---|---|
+| `id` | `id` | `varchar(26)` | | ULID | PK |
+| `user_id` | `userId` | `varchar(26)` | | | FK → `users.id` |
+| `provider` | `provider` | enum `EAuthIdentityProvider` | | | |
+| `provider_user_id` | `providerUserId` | `varchar(255)` | | | The user's ID at the provider: email address for `email`, E.164 number for `phone`, Google `sub` for `google` |
+| `password_hash` | `passwordHash` | `varchar(255)` | ✓ | | Only for `email` identities with a password |
+| `is_verified` | `isVerified` | `boolean` | | `false` | |
+| `created_at` | `createdAt` | `timestamptz` | | `now()` | |
+| `updated_at` | `updatedAt` | `timestamptz` | | `now()` | |
+
+**Constraints:**
+- `uq_auth_identities_user_id_provider`: unique on `(user_id, provider)`, so a user has at most one identity per provider. Its index also serves lookups by `user_id`.
+- `uq_auth_identities_provider_provider_user_id`: unique on `(provider, provider_user_id)`, so one email / phone / Google account can't be linked to two users.
+
+> Normalize `provider_user_id` before writing (lowercase emails, E.164 phones). Unlike `users.email`, it's not `citext`.
+
+### `auth_sessions` — `AuthSessionEntity`
 
 One row per refresh token / logged-in device.
 
@@ -231,19 +250,6 @@ One row per refresh token / logged-in device.
 | `revoked_at` | `revokedAt` | `timestamptz` | ✓ | | Set on logout / revocation |
 | `last_used_at` | `lastUsedAt` | `timestamptz` | | `now()` | |
 | `created_at` | `createdAt` | `timestamptz` | | `now()` | |
-
-### `user_documents` — `UserDocumentEntity`
-
-| Column | Property | Type | Null | Default | Notes |
-|---|---|---|---|---|---|
-| `id` | `id` | `varchar(26)` | | ULID | PK |
-| `user_id` | `userId` | `varchar(26)` | | | FK → `users.id`, indexed |
-| `type` | `type` | enum `EUserDocument` | | | |
-| `url` | `url` | `text` | | | |
-| `document_number` | `documentNumber` | `varchar(100)` | | | Sensitive ID number, stored as plain text |
-| `expiry_date` | `expiryDate` | `date` (`string`) | ✓ | | |
-| `created_at` | `createdAt` | `timestamptz` | | `now()` | |
-| `updated_at` | `updatedAt` | `timestamptz` | | `now()` | |
 
 ---
 
@@ -261,7 +267,7 @@ Stored as native Postgres enum types. Values can be added later, but not removed
 | `ECURRENCY` | `types/misc.type.ts` | `inr`, `usd`, `cad`, `aed` |
 | `ETourInquiryStatus` | `types/tour_inquiries.type.ts` | `new`, `contacted`, `in_progress`, `converted`, `closed` |
 | `EUserRole` | `types/users.type.ts` | `customer`, `admin`, `guide` |
-| `EUserDocument` | `types/user_documents.type.ts` | `aadhaar`, `driving_license`, `visa`, `passport` |
+| `EAuthIdentityProvider` | `types/auth_identities.type.ts` | `email`, `phone`, `google` |
 
 ## JSONB shapes
 

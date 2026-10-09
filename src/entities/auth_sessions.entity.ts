@@ -11,12 +11,12 @@ import {
 } from 'typeorm';
 import { UserEntity } from './users.entity.js';
 
-@Entity('user_sessions')
-export class UserSessionEntity {
+@Entity('auth_sessions')
+export class AuthSessionEntity {
   @PrimaryColumn({ name: 'id', type: 'varchar', length: 26 })
   id: string = ulid();
 
-  @Index('idx_user_sessions_user_id')
+  @Index('idx_auth_sessions_user_id')
   @Column({ name: 'user_id', type: 'varchar', length: 26 })
   userId: string;
 
@@ -25,7 +25,7 @@ export class UserSessionEntity {
   })
   @JoinColumn({
     name: 'user_id',
-    foreignKeyConstraintName: 'fk_user_sessions_user_id',
+    foreignKeyConstraintName: 'fk_auth_sessions_user_id',
   })
   user: Relation<UserEntity>;
 
