@@ -6,7 +6,7 @@ export enum ETokenFor {
 }
 
 export const VerifiedUserPayloadSchema = z.object({
-  type: ETokenFor.USER,
+  type: z.literal(ETokenFor.USER),
   role: z.enum(EUserRole),
   userId: z.string(),
   session: z.object({
@@ -17,9 +17,9 @@ export const VerifiedUserPayloadSchema = z.object({
   }),
 });
 
-export const VerifiedToken̦PayloadSchema = z.discriminatedUnion('type', [
+export const VerifiedTokenPayloadSchema = z.discriminatedUnion('type', [
   VerifiedUserPayloadSchema,
 ]);
 
-export type TVerifiedTokenPayload = z.infer<typeof VerifiedToken̦PayloadSchema>;
+export type TVerifiedTokenPayload = z.infer<typeof VerifiedTokenPayloadSchema>;
 export type TVerifiedUserPayload = z.infer<typeof VerifiedUserPayloadSchema>;

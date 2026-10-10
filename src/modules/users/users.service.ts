@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { UserRepository } from './users.repository.js';
 import { CreateUserDto, UpdateUserDto, UserDto } from './users.dto.js';
@@ -7,7 +11,10 @@ import { CreateUserDto, UpdateUserDto, UserDto } from './users.dto.js';
 export class UserService {
   constructor(private readonly repo: UserRepository) {}
 
-  async create(record: CreateUserDto, txn?: EntityManager): Promise<UserDto> {
+  async create(
+    record: CreateUserDto,
+    txn: EntityManager | null,
+  ): Promise<UserDto> {
     return await this.repo.create(record, txn);
   }
 
@@ -22,10 +29,35 @@ export class UserService {
     return user;
   }
 
+  async findByEmailOrPhone(
+    email: string | null,
+    phone: string | null,
+  ): Promise<UserDto | null> {
+    if (!email && !phone)
+      throw new UnprocessableEntityException('Email or phone is required.');
+
+    return await this.repo.findByEmailOrPhone(email, phone);
+  }
+
+  async findByEmailOrPhoneOrThrow(
+    email: string | null,
+    phone: string | null,
+  ): Promise<UserDto> {
+    if (!email && !phone)
+      throw new UnprocessableEntityException('Email or phone is required.');
+
+    const data = await this.repo.findByEmailOrPhone(email, phone);
+    if (!data) {
+      throw new NotFoundException('User not found.');
+    }
+
+    return data;
+  }
+
   async update(
     id: string,
     record: UpdateUserDto,
-    txn?: EntityManager,
+    txn: EntityManager | null,
   ): Promise<void> {
     await this.repo.update(id, record, txn);
   }

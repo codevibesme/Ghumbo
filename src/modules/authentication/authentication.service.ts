@@ -1,0 +1,263 @@
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import {
+  AuthSuccessResponseDto,
+  SignInDto,
+  SignUpDto,
+} from './authentication.dto.js';
+import { UserService } from '../users/users.service.js';
+import { AuthIdentityService } from '../auth_identities/auth_identities.service.js';
+import { EAuthIdentityProvider } from '../../types/auth_identities.type.js';
+import { BcryptService } from '../../utilities/jwt/bcrypt.service.js';
+import { JwtUtilityService } from '../../utilities/jwt/jwt.service.js';
+import { createHash, randomBytes } from 'crypto';
+import { ETokenFor } from '../../types/jwt.type.js';
+import { AuthSessionService } from '../auth_sessions/auth_sessions.service.js';
+import { UserSessionSignatureDto } from '../auth_sessions/auth_sessions.dto.js';
+import { EUserRole } from '../../types/users.type.js';
+import { TxnHelperService } from '../../helpers/txn.service.js';
+
+@Injectable()
+export class AuthenticationService {
+  constructor(
+    private readonly userService: UserService,
+    private readonly authIdentityService: AuthIdentityService,
+    private readonly authSessionService: AuthSessionService,
+    private readonly bcrypt: BcryptService,
+    private readonly jwt: JwtUtilityService,
+    private readonly txn: TxnHelperService,
+  ) {}
+  private readonly SALT_ROUNDS = 10;
+  private readonly REFRESH_TOKEN_VALIDITY = 7 * 24 * 60 * 60 * 1000;
+  private readonly ACCESS_TOKEN_VALIDITY = 15 * 60;
+
+  async signUp(
+    record: SignUpDto,
+    userSessionSignature: UserSessionSignatureDto,
+  ): Promise<AuthSuccessResponseDto> {
+    const existingUser = await this.userService.findByEmailOrPhone(
+      record.email,
+      record.phone,
+    );
+
+    if (existingUser) {
+      throw new ConflictException('Account already exists.');
+    }
+
+    const existingAuthIdentity =
+      await this.authIdentityService.findByProviderAndProviderUserId(
+        record.email
+          ? EAuthIdentityProvider.EMAIL
+          : EAuthIdentityProvider.PHONE,
+        record.email ?? record.phone ?? '',
+      );
+    if (existingAuthIdentity) {
+      throw new ConflictException('Account already exists');
+    }
+
+    let accessToken: string;
+
+    const refreshToken = randomBytes(32).toString('hex');
+    const refreshTokenHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+
+    const passwordHash = await this.bcrypt.genHash(
+      record.password,
+      this.SALT_ROUNDS,
+    );
+
+    const { user, session } = await this.txn.run(async (txnManager) => {
+      const user = await this.userService.create(
+        {
+          name: record.name,
+          email: record.email,
+          phone: record.phone,
+          photo: null,
+          role: EUserRole.CUSTOMER,
+        },
+        txnManager,
+      );
+
+      await this.authIdentityService.create(
+        {
+          isVerified: true,
+          passwordHash: passwordHash,
+          provider: record.email
+            ? EAuthIdentityProvider.EMAIL
+            : EAuthIdentityProvider.PHONE,
+          providerUserId: record.email ?? record.phone ?? '',
+          userId: user.id,
+        },
+        txnManager,
+      );
+
+      const session = await this.authSessionService.create(
+        {
+          expiresAt: new Date(Date.now() + this.REFRESH_TOKEN_VALIDITY),
+          refreshTokenHash: refreshTokenHash,
+          revokedAt: null,
+          userId: user.id,
+          lastUsedAt: new Date(),
+          deviceId: userSessionSignature.deviceId,
+          ipAddress: userSessionSignature.ipAddress,
+          userAgent: userSessionSignature.userAgent,
+        },
+        txnManager,
+      );
+
+      return { user, session };
+    });
+
+    accessToken = await this.jwt.sign(
+      {
+        type: ETokenFor.USER,
+        role: user.role,
+        userId: user.id,
+        session: {
+          id: session.id,
+          expiresAt: session.expiresAt,
+          revokedAt: session.revokedAt,
+          lastUsedAt: session.lastUsedAt,
+        },
+      },
+      this.ACCESS_TOKEN_VALIDITY,
+    );
+
+    return {
+      refreshToken: refreshToken,
+      accessToken: accessToken,
+    };
+  }
+
+  async signIn(
+    record: SignInDto,
+    userSessionSignature: UserSessionSignatureDto,
+  ): Promise<AuthSuccessResponseDto> {
+    const user = await this.userService.findByEmailOrPhoneOrThrow(
+      record.email,
+      record.phone,
+    );
+    const authIdentity =
+      await this.authIdentityService.findByUserIdAndProviderOrThrow(
+        user.id,
+        record.email
+          ? EAuthIdentityProvider.EMAIL
+          : EAuthIdentityProvider.PHONE,
+      );
+    if (!authIdentity.passwordHash) {
+      throw new UnauthorizedException(
+        'Password is required for email or phone sign-in.',
+      );
+    }
+
+    const isValidPassword = await this.bcrypt.compare(
+      record.password,
+      authIdentity.passwordHash,
+    );
+    if (!isValidPassword) {
+      throw new UnauthorizedException('Password is invalid.');
+    }
+
+    const refreshToken = randomBytes(32).toString('hex');
+    const refreshTokenHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+
+    const session = await this.authSessionService.create(
+      {
+        expiresAt: new Date(Date.now() + this.REFRESH_TOKEN_VALIDITY),
+        refreshTokenHash: refreshTokenHash,
+        revokedAt: null,
+        userId: user.id,
+        lastUsedAt: new Date(),
+        deviceId: userSessionSignature.deviceId,
+        ipAddress: userSessionSignature.ipAddress,
+        userAgent: userSessionSignature.userAgent,
+      },
+      null,
+    );
+
+    const accessToken = await this.jwt.sign(
+      {
+        type: ETokenFor.USER,
+        role: user.role,
+        userId: user.id,
+        session: {
+          id: session.id,
+          expiresAt: session.expiresAt,
+          revokedAt: session.revokedAt,
+          lastUsedAt: session.lastUsedAt,
+        },
+      },
+      this.ACCESS_TOKEN_VALIDITY,
+    );
+
+    return {
+      refreshToken: refreshToken,
+      accessToken: accessToken,
+    };
+  }
+
+  async refresh(refreshToken: string): Promise<AuthSuccessResponseDto> {
+    const refreshTokenHash = createHash('sha256')
+      .update(refreshToken)
+      .digest('hex');
+    const authSession =
+      await this.authSessionService.findByRefreshTokenHashOrThrow(
+        refreshTokenHash,
+      );
+
+    if (authSession.revokedAt || authSession.expiresAt <= new Date()) {
+      throw new UnauthorizedException('Session has expired.');
+    }
+
+    const user = await this.userService.findByIdOrThrow(authSession.userId);
+
+    const newRefreshToken = randomBytes(32).toString('hex');
+    const newRefreshTokenHash = createHash('sha256')
+      .update(newRefreshToken)
+      .digest('hex');
+
+    const updatedAuthSession = await this.authSessionService.rotateRefreshToken(
+      authSession.id,
+      authSession.refreshTokenHash,
+      newRefreshTokenHash,
+    );
+
+    const accessToken = await this.jwt.sign(
+      {
+        type: ETokenFor.USER,
+        role: user.role,
+        userId: user.id,
+        session: {
+          id: updatedAuthSession.id,
+          expiresAt: updatedAuthSession.expiresAt,
+          revokedAt: updatedAuthSession.revokedAt,
+          lastUsedAt: updatedAuthSession.lastUsedAt,
+        },
+      },
+      this.ACCESS_TOKEN_VALIDITY,
+    );
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+    };
+  }
+
+  async signOut(userId: string, sessionId: string): Promise<void> {
+    const user = await this.userService.findByIdOrThrow(userId);
+    const authSession =
+      await this.authSessionService.findByIdOrThrow(sessionId);
+
+    if (user.id !== authSession.userId) {
+      throw new UnauthorizedException("Session doesn't belong to the user");
+    }
+
+    await this.authSessionService.revokeSession(sessionId);
+  }
+}
